@@ -128,6 +128,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# Qt files
+.qt_for_python
+
 # database
 data.bak
 data.dir

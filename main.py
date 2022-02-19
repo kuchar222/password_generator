@@ -6,7 +6,7 @@ import pyperclip
 import shelve
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget
 from PySide6.QtUiTools import QUiLoader
-from PySide6.QtGui import QFont, QPixmap, QIcon
+from PySide6.QtGui import QPixmap, QIcon
 from PySide6.QtCore import Slot, QSize
 
 # minimalna długość hasła
@@ -49,8 +49,7 @@ class GeneratorHasel(QMainWindow):
             self.zapiszWindow.show()
         else:
             self.window.label_6.setText("Brak wygenerowanego hasła")
-        
-      
+       
     @Slot()
     def generuj_haslo(self):
         # metoda generująca hasło zgodnie z podaną liczbą znaków:
