@@ -4,7 +4,7 @@ import random
 import string
 import pyperclip
 import shelve
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QMessageBox
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtGui import QPixmap, QIcon
 from PySide6.QtCore import Slot, QSize
@@ -42,13 +42,21 @@ class GeneratorHasel(QMainWindow):
     @Slot()
     def zapisz(self):
         # otwiera okno do zapisu haseł
-        print('test')
         if len(self.password) > 7:
             self.zapiszWindow = Zapisz(self.password)
             self.zapiszWindow.setWindowTitle("Zapisywanie")
             self.zapiszWindow.show()
         else:
-            self.window.label_6.setText("Brak wygenerowanego hasła")
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Information)
+            msg.setWindowTitle('Info')
+            msg.setText('Nie wygenerowano hasła, czy chcesz zapisać własne?')
+            msg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+            k = msg.exec()
+            if k == 1024:
+                self.zapiszWindow = Zapisz('')
+                self.zapiszWindow.setWindowTitle("Zapisywanie")
+                self.zapiszWindow.show()
        
     @Slot()
     def generuj_haslo(self):
@@ -117,22 +125,52 @@ class Zapisz(QWidget):
         self.window.zapiszButton.clicked.connect(self.zapisz_haslo)
         self.window.zamknijButton.clicked.connect(self.zamknij)
     
+    def name_exist_msg(self):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Warning)
+        msg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+        msg.setWindowTitle('Uwaga')
+        msg.setText('Ta pozycja już istnieje, czy chcesz ją nadpisać?')
+        return msg.exec() 
+
+    def save_msg(self):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setWindowTitle('Info')
+        msg.setText('Zapisano hasło')
+        msg.exec()
+
+    def fill_empty_msg(self):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setWindowTitle('Info')
+        msg.setText('Uzupełnij puste pola')
+        msg.exec()
+
     @Slot()
     def zapisz_haslo(self):
-        # zapisuje nowe hasło wraz zloginem i nazwą w pamięci (plik: data)
+        # zapisuje nowe hasło wraz z loginem i nazwą w pamięci (plik: data)
         hasla = shelve.open(r'C:\Users\kucha\Kodowanie\Nauka\generator\data')
         if self.window.nameLine.text() in list(hasla.keys()):
-            # TODO komunikat - taka pozycja już istnieje, czy chcesz ją zastąpić? 
-            # utworzyć okno z wyborem tak - nie
-            print('taka pozycja już istnieje, czy chcesz ją zastąpić?')
+            k = self.name_exist_msg()
+            if k == 1024:
+                if len(self.window.loginLine.text()) > 0:
+                    hasla[self.window.nameLine.text()] = self.window.loginLine.text(), self.password
+                    hasla.close()
+                    self.destroy()
+                    self.save_msg()
+                else:
+                    self.fill_empty_msg()
+            else:
+                hasla.close()
+                self.destroy()       
         elif len(self.window.nameLine.text()) > 0 and len(self.window.loginLine.text()) > 0:
             hasla[self.window.nameLine.text()] = self.window.loginLine.text(), self.password
-            print('zapisano hasło')
-        else:
-            # TODO komunikat - uzupełnij puste pola
-            
-            print('uzupełnij puste pola')
-        hasla.close()   
+            hasla.close()
+            self.save_msg()
+            self.destroy()
+        else:           
+            self.fill_empty_msg()
 
     @Slot()
     def zamknij(self):
@@ -147,5 +185,4 @@ if __name__ == '__main__':
     app = QApplication([])
     app.setQuitOnLastWindowClosed(False)
     window = GeneratorHasel()
-    
     sys.exit(app.exec())
