@@ -7,10 +7,12 @@ import shelve
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QMessageBox
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtGui import QPixmap, QIcon
-from PySide6.QtCore import Slot, QSize
+from PySide6.QtCore import Slot, QSize, Signal
 
 # minimalna długość hasła
 MIN_PASSWORD_LENGTH = 8
+# ścieżka do pliku z danymi
+FILEPATH = r'C:\Users\kucha\Kodowanie\Nauka\generator\data'
 
 # klasa okna głównego aplikacji
 class GeneratorHasel(QMainWindow):
@@ -37,13 +39,15 @@ class GeneratorHasel(QMainWindow):
     @Slot()
     def otworz(self):
         # otwiera okno do pobierania haseł
-        pass
+        self.otworzWindow = Otworz(FILEPATH)
+        self.otworzWindow.setWindowTitle('Pobieranie haseł')
+        self.otworzWindow.show()
 
     @Slot()
     def zapisz(self):
         # otwiera okno do zapisu haseł
         if len(self.password) > 7:
-            self.zapiszWindow = Zapisz(self.password)
+            self.zapiszWindow = Zapisz(self.password, FILEPATH)
             self.zapiszWindow.setWindowTitle("Zapisywanie")
             self.zapiszWindow.show()
         else:
@@ -54,7 +58,7 @@ class GeneratorHasel(QMainWindow):
             msg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
             k = msg.exec()
             if k == 1024:
-                self.zapiszWindow = Zapisz('')
+                self.zapiszWindow = Zapisz('', FILEPATH)
                 self.zapiszWindow.setWindowTitle("Zapisywanie")
                 self.zapiszWindow.show()
        
@@ -115,9 +119,12 @@ class GeneratorHasel(QMainWindow):
 
 # zpaisywanie haseł do pamięci
 class Zapisz(QWidget):
-    def __init__(self, password):
+    zapisano_haslo = Signal()
+
+    def __init__(self, password, filepath):
         super().__init__()
         self.password = password
+        self.path = filepath
         loader = QUiLoader()
         self.window = loader.load(r"C:\Users\kucha\Kodowanie\Nauka\generator\zapisz.ui", self)
         self.window.passwordLine.setText(self.password)
@@ -138,11 +145,12 @@ class Zapisz(QWidget):
         msg.setIcon(QMessageBox.Information)
         msg.setWindowTitle('Info')
         msg.setText('Zapisano hasło')
+        self.zapisano_haslo.emit()
         msg.exec()
 
     def fill_empty_msg(self):
         msg = QMessageBox()
-        msg.setIcon(QMessageBox.Information)
+        msg.setIcon(QMessageBox.Warning)
         msg.setWindowTitle('Info')
         msg.setText('Uzupełnij puste pola')
         msg.exec()
@@ -150,36 +158,101 @@ class Zapisz(QWidget):
     @Slot()
     def zapisz_haslo(self):
         # zapisuje nowe hasło wraz z loginem i nazwą w pamięci (plik: data)
-        hasla = shelve.open(r'C:\Users\kucha\Kodowanie\Nauka\generator\data')
+        hasla = shelve.open(self.path)
         if self.window.nameLine.text() in list(hasla.keys()):
             k = self.name_exist_msg()
             if k == 1024:
-                if len(self.window.loginLine.text()) > 0:
-                    hasla[self.window.nameLine.text()] = self.window.loginLine.text(), self.password
+                if len(self.window.loginLine.text()) > 0 and len(self.window.passwordLine.text()) > 0:
+                    hasla[self.window.nameLine.text()] = self.window.loginLine.text(), self.window.passwordLine.text()
                     hasla.close()
-                    self.destroy()
+                    self.close()
                     self.save_msg()
                 else:
                     self.fill_empty_msg()
             else:
                 hasla.close()
-                self.destroy()       
-        elif len(self.window.nameLine.text()) > 0 and len(self.window.loginLine.text()) > 0:
-            hasla[self.window.nameLine.text()] = self.window.loginLine.text(), self.password
+                self.close()       
+        elif len(self.window.nameLine.text()) > 0 and len(self.window.loginLine.text()) > 0 and len(self.window.passwordLine.text()) > 0:
+            hasla[self.window.nameLine.text()] = self.window.loginLine.text(), self.window.passwordLine.text()
             hasla.close()
             self.save_msg()
-            self.destroy()
+            self.close()
         else:           
             self.fill_empty_msg()
 
     @Slot()
     def zamknij(self):
-        self.destroy()
+        self.close()
 
 # pobieranie haseł z pamięci
 class Otworz(QWidget):
-    def __init__(self):
+    def __init__(self, filepath=str):
         super().__init__()
+        self.path = filepath
+        loader = QUiLoader()
+        self.window = loader.load(r"C:\Users\kucha\Kodowanie\Nauka\generator\otworz.ui", self)
+
+        # tworzenie obiektów grafiki
+        pix_copy = QPixmap(r'C:\Users\kucha\Kodowanie\Nauka\generator\copy.png')
+        self.window.kopiujBtn1.setIcon(QIcon(pix_copy))
+        self.window.kopiujBtn1.setIconSize(QSize(30, 30))
+        self.window.kopiujBtn2.setIcon(QIcon(pix_copy))
+        self.window.kopiujBtn2.setIconSize(QSize(30, 30))
+
+        # przypisywanie funkcji do przycisków i list
+        self.window.listWidget.clicked.connect(self.wybierz_haslo)
+        self.window.kopiujBtn1.clicked.connect(self.kopiuj_login)
+        self.window.kopiujBtn2.clicked.connect(self.kopiuj_haslo)
+        self.window.usunBtn.clicked.connect(self.usun_haslo)
+        self.window.dodajBtn.clicked.connect(self.dodaj_haslo)
+
+        self.laduj_baze()
+    
+    def usun_haslo(self):
+        # usuwa wybraną pozycję z listy haseł
+        item = self.window.listWidget.currentItem().text()
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Warning)
+        msg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+        msg.setWindowTitle('Uwaga')
+        msg.setText(f'Czy chcesz usunąć: \n  {item} ?')
+        k = msg.exec()
+        if  k == 1024:
+            hasla = shelve.open(self.path)
+            del hasla[item]
+            hasla.close()
+            self.laduj_baze()
+  
+    def dodaj_haslo(self):
+        self.zapiszWindow = Zapisz('', FILEPATH)
+        self.zapiszWindow.setWindowTitle("Zapisywanie")
+        self.zapiszWindow.zapisano_haslo.connect(self.laduj_baze)
+        self.zapiszWindow.show()
+ 
+    def kopiuj_login(self):
+        pyperclip.copy(self.window.label_login.text())
+    
+    def kopiuj_haslo(self):
+        pyperclip.copy(self.window.label_password.text())
+
+    @Slot()
+    def laduj_baze(self):
+        # ładuje baze zapisanych haseł do widgetu listWidget
+        self.window.listWidget.clear()
+        hasla = shelve.open(self.path)
+        names_number = 0
+        for i, key in enumerate(hasla.keys()):
+            names_number = 1 + i
+            self.window.listWidget.insertItem(i, key)
+        hasla.close()
+        self.window.label_lista.setText(f'Lista zapisanych haseł:   {names_number}')
+        
+    def wybierz_haslo(self):
+        item = self.window.listWidget.currentItem().text()
+        haslo = shelve.open(self.path)
+        self.window.label_login.setText(str(haslo[item][0]))
+        self.window.label_password.setText(str(haslo[item][1]))
+        haslo.close()
 
 if __name__ == '__main__':
     app = QApplication([])
