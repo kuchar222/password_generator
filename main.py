@@ -4,6 +4,8 @@ import sys
 import random
 import string
 import shelve
+import requests
+from hashlib import sha1
 import pyperclip
 from PySide6.QtWidgets import QApplication
 from PySide6.QtWidgets import QMainWindow
@@ -114,7 +116,24 @@ class GeneratorHasel(QMainWindow):
 
             random.shuffle(password)
             self.password = "".join(password)
-            self.window.label_password.setText(self.password)
+            if self.validate_password(self.password):
+                self.window.label_password.setText(self.password)
+            else:
+                self.window.label_6.setText("Wygeneruj jeszcze raz hasło")
+
+    def validate_password(self, password):
+        """sprawdza czy hasło wyciekło
+
+        Args:
+            password (str): hasło do sprawdzenia
+
+        Returns:
+            bool: True jeżeli hasło nie wyciekło
+        """
+        password_hash = sha1(password.encode('utf-8')).hexdigest().upper()
+        url = 'https://api.pwnedpasswords.com/range/' + f'{password_hash[:5]}'
+        response = requests.get(url).text.split()
+        return bool(password_hash[5:] not in [hash.partition(':')[0] for hash in response])
 
     def kopiuj_haslo(self):
         pyperclip.copy(self.password) if len(self.password) > 7 \

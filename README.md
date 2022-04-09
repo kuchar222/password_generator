@@ -1,2 +1,4 @@
 # password_generator
-simply password generator with password database
+
+Simply password generator with password database and validation.
+To password validation used API <https://haveibeenpwned.com/>
